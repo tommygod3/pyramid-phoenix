@@ -240,17 +240,6 @@ class Wizard(MyView):
         breadcrumbs.append(dict(route_path=self.request.route_path('wizard'), title='Wizard'))
         return breadcrumbs
 
-    def resources(self):
-        resources = []
-        resource = self.wizard_state.get('wizard_source')['source']
-        # TODO: refactore this ... there is a common way
-        if resource == 'wizard_csw':
-            selection = self.wizard_state.get(resource).get('selection', [])
-            logger.debug("catalog selection: %s", selection)
-            self.csw.getrecordbyid(id=selection)
-            resources = [str(rec.source) for rec in self.csw.records.values()]
-        return resources
-
     def view(self):
         form = self.generate_form()
 
