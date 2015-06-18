@@ -117,6 +117,18 @@ class WizardState(object):
         self.session['wizard'] = dict(state={}, chain=[self.initial_step])
         self.session.changed()
 
+    def start_loop(self, items):
+        self.session['wizard']['loop'] = dict(item=0, items=items)
+        self.session.changed()
+
+    def next_loop(self):
+        item = self.session['wizard']['loop']['item']
+        items = self.session['wizard']['loop']['items']
+        if item < len(items):
+            self.session['wizard']['loop']['item'] = item + 1
+            self.session.changed()
+        return items(item)
+
 @view_defaults(permission='submit', layout='default')
 class Wizard(MyView):
     def __init__(self, request, name, title, description=None):
