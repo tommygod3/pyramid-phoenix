@@ -67,7 +67,7 @@ class ChooseWPSProcess(Wizard):
         if count_literal_inputs(self.wps, identifier) > 0:
             return self.next('wizard_literal_inputs')
         self.wizard_state.set('wizard_literal_inputs', {})
-        return self.next('wizard_complex_inputs')
+        return self.next('wizard_source')
         
     @view_config(route_name='wizard_process', renderer='../templates/wizard/default.pt')
     def view(self):

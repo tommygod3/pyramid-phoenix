@@ -29,7 +29,7 @@ class Done(Wizard):
 
     def workflow_description(self):
         # source_type
-        source_type = self.wizard_state.get('wizard_source')['source']
+        source_type = self.wizard_state.get('wizard_source').items()[0][1]
         workflow = dict(name=source_type, source={}, worker={})
 
         # source
@@ -65,7 +65,7 @@ class Done(Wizard):
             url = self.wps.url,
             identifier = self.wizard_state.get('wizard_process')['identifier'],
             inputs = [(key, value) for key,value in inputs],
-            resource = self.wizard_state.get('wizard_complex_inputs')['identifier'],
+            resource = self.wizard_state.get('wizard_source').items()[0][0],
             )
         workflow['worker'] = worker
         return workflow
