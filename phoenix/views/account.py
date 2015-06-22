@@ -1,25 +1,18 @@
 import datetime
 
 from pyramid.view import view_config, view_defaults, forbidden_view_config
-from pyramid.httpexceptions import HTTPFound
+from pyramid.httpexceptions import HTTPFound, HTTPForbidden
 from pyramid.response import Response
 from pyramid.renderers import render, render_to_response
 from pyramid.security import remember, forget, authenticated_userid
 from deform import Form, ValidationFailure
-from authomatic import Authomatic
-from authomatic.adapters import WebObAdapter
 
 from phoenix.views import MyView
-from phoenix.security import Admin, Guest, admin_users, ESGF_Provider
+from phoenix.security import Admin, Guest, ESGF_Provider, authomatic, admin_users, passwd_check
 
 import logging
 logger = logging.getLogger(__name__)
 
-from phoenix import config_public as config
-authomatic = Authomatic(config=config.config,
-                        secret=config.SECRET,
-                        report_errors=True,
-                        logging_level=logging.DEBUG)
 
 @forbidden_view_config(renderer='phoenix:templates/account/forbidden.pt', layout="frontpage")
 def forbidden(request):
@@ -36,16 +29,25 @@ class Account(MyView):
     def __init__(self, request):
         super(Account, self).__init__(request, name="account", title='Account')
 
-    def appstruct(self):
-        return dict(provider='DKRZ')
+    def appstruct(self, protocol):
+        if protocol == 'oauth2':
+            return dict(provider='github')
+        elif protocol == 'esgf':
+            return dict(provider='DKRZ')
+        else:
+            return dict()
 
     def generate_form(self, protocol):
-        from phoenix.schema import OpenIDSchema, ESGFOpenIDSchema, LdapSchema
+        from phoenix.schema import PhoenixSchema, OAuthSchema, OpenIDSchema, ESGFOpenIDSchema, LdapSchema
         schema = None
-        if protocol == 'esgf':
+        if protocol == 'phoenix':
+            schema = PhoenixSchema()
+        elif protocol == 'esgf':
             schema = ESGFOpenIDSchema()
         elif protocol == 'openid':
             schema = OpenIDSchema()
+        elif protocol == 'oauth2':
+            schema = OAuthSchema()
         else:
             schema = LdapSchema()
         form = Form(schema=schema, buttons=('submit',), formid='deform')
@@ -59,11 +61,14 @@ class Account(MyView):
             logger.exception('validation of form failed.')
             return dict(active=protocol, form=e.render())
         else:
-            if protocol == 'ldap':
+            if protocol == 'phoenix':
+                return self.phoenix_login(appstruct)
+            elif protocol == 'ldap':
                 return self.ldap_login()
+            elif protocol == 'oauth2':
+                return HTTPFound(location=self.request.route_path('account_auth', provider_name=appstruct.get('provider')))
             else:
-                logger.debug('openid route = %s', self.request.route_path('account_openid', _query=appstruct.items()))
-                return HTTPFound(location=self.request.route_path('account_openid', _query=appstruct.items()))
+                return HTTPFound(location=self.request.route_path('account_auth', provider_name=protocol, _query=appstruct.items()))
 
     def send_notification(self, email, subject, message):
         """Sends email notification to admins.
@@ -84,92 +89,112 @@ class Account(MyView):
                           sender=sender,
                           recipients=recipients,
                           body=message)
-        mailer.send_immediately(message, fail_silently=True)
+        try:
+            mailer.send_immediately(message, fail_silently=True)
+        except:
+            logger.exception("failed to send notification")
 
-    def login_success(self, email, openid=None, name="Unknown"):
+    def login_success(self, userid, email=None, name="Unknown", openid=None):
         from phoenix.models import add_user
-        logger.debug('login success: email=%s', email)
-        user = self.get_user(email)
+        # TODO: fix handling of userid
+        user = self.get_user(userid)
         if user is None:
-            logger.warn("openid login: new user %s", email)
-            user = add_user(self.request, email=email, group=Guest)
-            subject = 'New user %s logged in on %s' % (email, self.request.server_name)
-            message = 'Please check the activation of the user %s on the Phoenix host %s' % (email, self.request.server_name)
+            logger.warn("new user: %s", userid)
+            user = add_user(self.request, userid=userid, email=email, group=Guest)
+            subject = 'New user %s logged in on %s' % (name, self.request.server_name)
+            message = 'Please check the activation of the user %s on the Phoenix host %s' % (name, self.request.server_name)
             self.send_notification(email, subject, message)
-        if email in admin_users(self.request):
+        if userid in admin_users(self.request):
             user['group'] = Admin
         user['last_login'] = datetime.datetime.now()
         if openid is not None:
             user['openid'] = openid
         user['name'] = name
-        self.userdb.update({'email':email}, user)
-        self.session.flash("Welcome %s (%s)." % (name, email), queue='success')
+        self.userdb.update({'userid':userid}, user)
+        self.session.flash("Welcome {0}.".format(name), queue='success')
         if user.get('group') == Guest:
             self.session.flash("You are logged in as guest. You are not allowed to submit any process.", queue='danger')
+        headers = remember(self.request, userid)
+        return HTTPFound(location = self.request.route_path('home'), headers = headers)
 
+    def login_failure(self, message=None):
+        msg = 'Sorry, login failed.'
+        if message:
+            msg = 'Sorry, login failed: {0}'.format(message)
+        self.session.flash(msg, queue='danger')
+        logger.warn(msg)
+        return HTTPFound(location = self.request.route_path('home'))
+    
     @view_config(route_name='account_login', renderer='phoenix:templates/account/login.pt')
     def login(self):
         protocol = self.request.matchdict.get('protocol', 'esgf')
 
         if protocol == 'ldap':
             # Ensure that the ldap connector is created
-            redirect = self.ldap_prepare()
-            if redirect is not None:
-                return redirect
+            self.ldap_prepare()
 
         form = self.generate_form(protocol)
         if 'submit' in self.request.POST:
             return self.process_form(form, protocol)
         # TODO: Add ldap to title?
-        return dict(active=protocol, title="ESGF OpenID", form=form.render( self.appstruct() ))
+        return dict(active=protocol, title="Login", form=form.render( self.appstruct(protocol) ))
 
     @view_config(route_name='account_logout', permission='edit')
     def logout(self):
         headers = forget(self.request)
         return HTTPFound(location = self.request.route_path('home'), headers = headers)
 
-    @view_config(route_name='account_openid')
-    def openid(self):
-        """authomatic openid login"""
-        username = self.request.params.get('username')
-        # esgf openid login with username and provider
-        if username is not None:
-            provider = self.request.params.get('provider')
-            logger.debug('username=%s, provider=%s', username, provider)
-            openid = ESGF_Provider.get(provider) % username
-            self.request.GET['id'] = openid
-            del self.request.GET['username']
-            del self.request.GET['provider']
+    def phoenix_login(self, appstruct):
+        password = appstruct.get('password')
+        if passwd_check(self.request, password):
+            return self.login_success(userid="phoenix@localhost", email="phoenix@localhost", name="Phoenix")
+        else:
+            return self.login_failure()
+
+    @view_config(route_name='account_auth')
+    def authomatic_login(self):
+        from authomatic.adapters import WebObAdapter
+        _authomatic = authomatic(self.request)
+        
+        provider_name = self.request.matchdict.get('provider_name')
+
+        if provider_name == 'esgf':
+            username = self.request.params.get('username')
+            provider_name = 'openid'
+            # esgf openid login with username and provider
+            if username is not None:
+                provider = self.request.params.get('provider')
+                logger.debug('username=%s, provider=%s', username, provider)
+                openid = ESGF_Provider.get(provider) % username
+                self.request.GET['id'] = openid
+                del self.request.GET['username']
+                del self.request.GET['provider']
             
         # Start the login procedure.
         response = Response()
-        #response = request.response
-        result = authomatic.login(WebObAdapter(self.request, response), "openid")
+        result = _authomatic.login(WebObAdapter(self.request, response), provider_name)
 
-        #logger.debug('authomatic login result: %s', result)
-
-        # TODO: refactor handling of result and response
         if result:
             if result.error:
                 # Login procedure finished with an error.
-                self.session.flash('Sorry, login failed: %s' % (result.error.message), queue='danger')
-                logger.warn('openid login failed: %s', result.error.message)
-                response.text = render('phoenix:templates/account/forbidden.pt', dict(), self.request)
+                return self.login_failure(message=result.error.message)
             elif result.user:
+                if not (result.user.name and result.user.id):
+                    result.user.update()
                 # Hooray, we have the user!
-                logger.info("openid login successful for user %s", result.user.email)
-                #logger.debug("user=%s, id=%s, email=%s, credentials=%s",
-                #          result.user.name, result.user.id, result.user.email, result.user.credentials)
-                #logger.debug("provider=%s", result.provider.name )
-                #logger.debug("response headers=%s", response.headers.keys())
-                #logger.debug("response cookie=%s", response.headers['Set-Cookie'])
-                self.login_success(email=result.user.email, openid=result.user.id, name=result.user.name)
-                response.text = render('phoenix:templates/account/openid_success.pt', {'result': result}, request=self.request)
-                # Add the headers required to remember the user to the response
-                response.headers.extend(remember(self.request, result.user.email))
-
-        #logger.debug('response: %s', response)
-
+                logger.info("login successful for user %s", result.user.name)
+                if result.provider.name == 'openid':
+                    # TODO: change userid ... more infos ...
+                    return self.login_success(userid=result.user.id, email=result.user.email, openid=result.user.id, name=result.user.name)
+                elif result.provider.name == 'github':
+                    logger.debug('logged in with github')
+                    # TODO: fix email ... get more infos ... which userid?
+                    userid = "{0.username}@github.com".format(result.user)
+                    email = "{0.username}@github.com".format(result.user)
+                    # get extra info
+                    if result.user.credentials:
+                        pass
+                    return self.login_success(userid=userid, email=email, name=result.user.name)
         return response
 
     def ldap_prepare(self):
@@ -201,12 +226,6 @@ class Account(MyView):
                     scope = ldap_scope)
             config.commit()
 
-            # FK: For some reason, this happens to be called multiple times after the server has been started.
-            #     As a workaround, redirect to the login page as long as this function is being called.
-            # TODO: Fix this, so that this set up will always be called once.
-            #self.session.flash('Set up LDAP connector! Please log in!', queue = 'success')
-            return HTTPFound(location = self.request.current_route_url())
-
     def ldap_login(self):
         """LDAP login"""
         username = self.request.params.get('username')
@@ -218,26 +237,14 @@ class Account(MyView):
         auth = connector.authenticate(username, password)
 
         if auth is not None:
-            # FK: At the moment, all user identification is build around the
-            #     email address as one primary, unique key. While this is fine
-            #     with OpenID, it is no longer true when LDAP comes into play.
-            #     Maybe we should move away from the email address being a key
-            #     identifier, but for now (and for testing) we just assume
-            #     there is always an LDAP attribute 'mail' which gives as an
-            #     unique identification.
             ldap_settings = self.db.ldap.find_one()
             email = auth[1].get(ldap_settings['email'])[0]
-
+            # TODO: fix userid ... get more ldap infos
+            userid = 'ldap_{0}'.format(email)
+            
             # Authentication successful
-            self.login_success(email = email)
-
-            # TODO: Rename template?
-            response = render_to_response('phoenix:templates/account/openid_success.pt',
-                    # FK: What is 'result' for? Just an old debug argument?
-                    {'result': email}, request = self.request)
-            response.headers.extend(remember(self.request, email))
-            return response
+            return self.login_success(userid=userid, email=email, name=email)
         else:
             # Authentification failed
-            self.session.flash('Sorry, login failed!', queue='danger')
-            return HTTPFound(location = self.request.current_route_url())
+            return self.login_failure()
+           

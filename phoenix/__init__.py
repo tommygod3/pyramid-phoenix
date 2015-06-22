@@ -17,8 +17,9 @@ def main(global_config, **settings):
     """
 
     # security
+    # TODO: move to security
     authn_policy = AuthTktAuthenticationPolicy(
-        'tellnoone', callback=groupfinder, hashalg='sha512')
+        settings.get('authomatic.secret'), callback=groupfinder, hashalg='sha512')
     authz_policy = ACLAuthorizationPolicy()
     config = Configurator(root_factory=root_factory, settings=settings)
     config.set_authentication_policy(authn_policy)
@@ -41,6 +42,9 @@ def main(global_config, **settings):
     config.include('pyramid_celery')
     config.configure_celery(global_config['__file__'])
 
+    # mozilla browserid
+    #config.include("pyramid_persona")
+
     # ldap
     config.include('pyramid_ldap')
     # FK: Ldap setup functions will be called on demand.
@@ -55,7 +59,7 @@ def main(global_config, **settings):
     # login
     config.add_route('account_login', '/account/login/{protocol}')
     config.add_route('account_logout', '/account/logout')
-    config.add_route('account_openid', '/account/openid')
+    config.add_route('account_auth', '/account/auth/{provider_name}')
     config.add_route('account_register', '/account/register')
 
     # dashboard
@@ -79,8 +83,8 @@ def main(global_config, **settings):
     # settings
     config.add_route('settings', '/settings/overview')
     config.add_route('settings_users', '/settings/users')
-    config.add_route('settings_edit_user', '/settings/users/{email}/edit')
-    config.add_route('remove_user', '/settings/users/{email}/remove')
+    config.add_route('settings_edit_user', '/settings/users/{userid}/edit')
+    config.add_route('remove_user', '/settings/users/{userid}/remove')
     config.add_route('settings_jobs', '/settings/jobs')
     config.add_route('settings_ldap', '/settings/ldap')
 

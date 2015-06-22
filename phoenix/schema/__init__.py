@@ -10,6 +10,25 @@ from phoenix.widget import (
 import logging
 logger = logging.getLogger(__name__)
 
+
+class PhoenixSchema(colander.MappingSchema):
+    password = colander.SchemaNode(
+        colander.String(),
+        title = 'Password',
+        description = 'Enter the Phoenix Password',
+        validator = colander.Length(min=8),
+        widget = deform.widget.PasswordWidget())
+
+class OAuthSchema(colander.MappingSchema):
+    choices = [('github', 'GitHub')]
+    
+    provider = colander.SchemaNode(
+        colander.String(),
+        validator=colander.OneOf([x[0] for x in choices]),
+        widget=deform.widget.RadioChoiceWidget(values=choices, inline=True),
+        title='OAuth 2.0 Provider',
+        description='Select your OAuth Provider.')
+
 class OpenIDSchema(colander.MappingSchema):
     id = colander.SchemaNode(
         colander.String(),

@@ -25,7 +25,7 @@ def navbar(context, request):
     if has_permission('admin', request.context, request):
         subitems.append( nav_item('Settings', request.route_path('settings'), icon="fa fa-wrench") )
     
-    login = request.current_route_url() == request.route_url('account_login', protocol='esgf')
+    login = request.current_route_url() == request.route_url('account_login', protocol='oauth2')
 
     return dict(title='Phoenix', items=items, subitems=subitems, username=authenticated_userid(request), login=login)
 
@@ -40,7 +40,7 @@ def sidebar(context, request):
 
 @panel_config(name='footer', renderer='phoenix:templates/panels/footer.pt')
 def footer(context, request):
-    return dict(version="0.4.0")
+    return dict(version="0.4.1")
 
 @panel_config(name='headings')
 def headings(context, request):
