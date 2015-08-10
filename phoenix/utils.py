@@ -6,12 +6,19 @@ logger = logging.getLogger(__name__)
 SIGNIN_HTML = '<a class="navbar-link btn-lg" href="%s" data-toggle="tooltip" title="Sign in"><span class="fa fa-sign-in"></span></a>'
 SIGNOUT_HTML = '<a class="navbar-link btn-lg" href="%s" data-toggle="tooltip" title="Sign out %s"><span class="fa fa-sign-out"></span></a>'
 
+
 def button(request):
     """If the user is logged in, returns the logout button, otherwise returns the login button"""
     import markupsafe
     from pyramid.security import authenticated_userid
+    from phoenix.models import auth_protocols
     if not authenticated_userid(request):
-        return markupsafe.Markup(SIGNIN_HTML) % (request.route_path('account_login', protocol='oauth2'))
+        protocols = auth_protocols(request)
+        if len(protocols) > 0:
+            protocol = protocols[-1]
+        else:
+            protocol = 'oauth2'
+        return markupsafe.Markup(SIGNIN_HTML) % (request.route_path('account_login', protocol=protocol))
     else:
         return markupsafe.Markup(SIGNOUT_HTML) % (request.route_path('account_logout'), authenticated_userid(request))
 

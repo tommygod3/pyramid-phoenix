@@ -14,18 +14,42 @@ The user guide explains how to use the Phoenix web application to interact with 
 Login
 -----
 
-You need an :term:`birdhouse:OpenID` account to login to Phoenix. You should use a `ESGF OpenID <https://github.com/ESGF/esgf.github.io/wiki/ESGF_Data_Download>`_ which is used later to access files from :term:`birdhouse:ESGF`. Make sure, that you have a valid OpenID of one of the ESGF datanodes (http://esgf-data.dkrz.de/esgf-web-fe/) and that you are able to download a datafile. 
-
-Now, press the ``Sign in`` button in the upper right corner.
+Press the ``Sign in`` button in the upper right corner.
 
 .. image:: _images/signin.png
 
-Next you will have a page where you can enter the account name of your ESGF OpenID. 
-Choose the according ESGF OpenID provider (by default this is DKRZ).
+The login page offers you several options to login to Phoenix.
+
+.. image:: _images/login.png
+
+If you login for the first time your account needs to be activated by an administrator.
+
+**Phoenix**
+
+Enter the password of the Phoenix user. Phoneix login might not be available.
+
+**OpenID**
+
+You can use an :term:`birdhouse:OpenID` account to login to Phoenix (for example from https://openid.stackexchange.com/).
 
 .. image:: _images/openid.png 
 
-In the current state of Phoenix (March 2015) you have to be :ref:`personally activated <activate_users>` in the Phoenix web application. 
+**ESGF OpenID**
+
+You can use an `ESGF OpenID <https://github.com/ESGF/esgf.github.io/wiki/ESGF_Data_Download>`_. The ESGF OpenID is used later to access files from :term:`birdhouse:ESGF`. Make sure, that you have a valid ESGF OpenID of one of the ESGF Providers (http://esgf-data.dkrz.de/esgf-web-fe/) and that you are able to download a datafile. 
+
+Enter the account name of your ESGF OpenID and choose the according ESGF OpenID provider (by default this is DKRZ).
+
+.. image:: _images/esgfopenid.png
+
+**OAuth2**
+
+Choose one of your OAuth providers: GitHub, Google, ...
+
+**LDAP**
+
+Enter your LDAP username and password. LDAP might not be available.
+
 
 Dashboard
 ---------
@@ -44,11 +68,7 @@ When you have registered WPS services you can run a process. Go to the
 
 .. image:: _images/processes.png
 
-Use the ``Choose WPS`` button to choose one of your registered WPS services. 
-
-.. image:: _images/processes_choose.png
-
-You will get a list of available processes (WPS ``GetCapabilities`` request). 
+Choose one of your registered WPS services. You will get a list of available processes (WPS ``GetCapabilities`` request). 
 
 .. image:: _images/processes_list.png
 
@@ -56,25 +76,24 @@ Choose one of these processes by using the ``Execute`` button.
 
 .. _execute:
 
-In case of Malleefowl you may try the ``Logon with ESGF OpenID`` process. You will then be
-prompted to enter your ESGF OpenID (e.a. https://esgf-data.dkrz.de/esgf-idp/openid/justatest) and
-password. 
+In case of Emu you may try the ``Hello World`` process. You will then be
+prompted to enter your username:
 
 .. image:: _images/processes_execute.png
 
-Press the ``Submit`` button. When the process is submitted you will be shown your job list in ``My Jobs``. 
+Press the ``Submit`` button. When the process is submitted you will be shown your job list in ``Monitor``. 
 
 .. _myjobs:
 
-My Jobs
+Monitor
 -------
 
-In ``My Jobs`` all your running or finished jobs are listed. 
+In ``Monitor`` all your running or finished jobs are listed. 
 The list shows the status and progress of your jobs. 
 
 .. image:: _images/myjobs.png
 
-When a job has finished with success you can see the results by using the ``Show`` button.  
+When a job has finished with success you can see the results by clicking the Job ID link.  
 
 .. image:: _images/myjobs_output.png
 
@@ -137,11 +156,7 @@ In ``My Account`` you can change your user settings (user name, organisation, op
 
 .. image:: _images/myaccount.png
 
-If you have a valid ESGF OpenID you can update your X509 credentials. This is a X509 proxy certificate which is used to access ESGF data. To update press the button ``Update Credentials`` and enter your OpenID password in the dialog.
 
-.. image:: _images/update_creds.png
-
-For security reasons the X509 proxy certificate is time limited. But don't worry; Phoenix will remind you to update if necessary.
 
 Settings (admins only)
 ----------------------
@@ -152,18 +167,22 @@ When you are logged-in as admin user you have the ``Settings`` page. Here you ca
 
 .. _register_wps:
 
-Register a WPS service
-~~~~~~~~~~~~~~~~~~~~~~
+Register a WPS or Thredds service
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Open the ``Settings/Catalog`` page. Here you can see which services are registered in the catalog service (we are using :term:`birdhouse:PyCSW`). All theses services are known and useable by Phoenix.
+Open the ``Settings/Services`` page. Here you can see which services are registered in the catalog service (we are using :term:`birdhouse:PyCSW`). All theses services are known and useable by Phoenix.
 
-.. image:: _images/settings_catalog.png
+.. image:: _images/settings_services.png
 
-To add a new WPS service press the ``Add Service`` button and enter the WPS URL in the field ``Service URL``, for example Malleefowl WPS:
+To add a new WPS service press the ``Register a new Service`` button and enter the WPS URL in the field ``Service URL``, for example Malleefowl WPS:
 
 http://localhost:8091/wps
 
-.. image:: _images/add_service.png
+.. image:: _images/add_wps_service.png
+
+To add a new Thredds service press the ``Register a new Service`` button again, enter the Thredds URL and choose ``Thredds Catalog`` as service type.
+
+.. image:: _images/add_thredds_service.png
 
 
 .. _activate_users:
@@ -173,16 +192,42 @@ Activate Users
 
 Open the ``Settings/Users`` page. Here you activate/deactivate users and also remove them. When a user has registerd to the Phoenix web application the user needs to be activated before the user can login.
 
-.. image:: _images/settings_users.png
+Choose Authentication Protocol
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Open the ``Settings/Auth`` page. Here you can choose the different authentication protocols (OpenID, LDAP, ...) which users can use on the login page.
+
+.. image:: _images/settings_auth.png 
 
 
 LDAP Support
 ~~~~~~~~~~~~
 
-Basic support for authentication via LDAP has been added recently. To enable LDAP login for your environment, make sure you already have admin access to Phoenix, e.g. with your OpenID account. Navigate to ``Settings/LDAP`` and configure Phoenix to match your LDAP environment.
+Basic support for authentication via LDAP has been added recently. To enable LDAP login for your environment, login with your admin account, navigate to ``Settings/LDAP`` and configure Phoenix to match your LDAP environment.
 
 .. image:: _images/settings_ldap.png
 
-The Phonix account system is build around the e-mail address a the key identifier for any user. For now, it is required for your LDAP system to provide an e-mail address as an attribute with every user entry. (This is most likely already the case.)
-
 There is no support for LDAP authorization yet. Use the ``Settings/Users`` backend to manage the access privileges for your users. There will be an entry for each user that has been logged in once before.
+
+Solr
+~~~~
+
+You can publish the datasets of a registered Thredds service to a Solr index server. The Solr server is setup with the Phoenix installation.
+
+.. image:: _images/solr_index.png
+
+Use the toggle button on the left side of the Thredds service name to activate the publishing. Publishing takes some time. Use the reload button to update the status.
+The Solr search can then be used in the ``Wizard`` to select input files.
+
+To clear the whole Solr index use the trash button.
+
+The publisher has two parameters.
+
+maxrecords
+    Maximum number of datasets that will be published. Use -1 for unlimited.
+
+depth
+    The maximum depth level when crawling Thredds catalogs. Default is 2.
+
+.. image:: _images/solr_params.png
+   

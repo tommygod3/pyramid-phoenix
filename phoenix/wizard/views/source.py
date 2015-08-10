@@ -6,10 +6,16 @@ from phoenix.catalog import wps_url
 import colander
 import deform
 
-choices = [
-    ('wizard_esgf_search', "Earth System Grid (ESGF)"),
-    ('wizard_swift_login', "Swift Cloud"),
-    ('wizard_threddsservice', "Thredds Catalog Service")]
+class Schema(colander.MappingSchema):
+    choices = [
+        ('wizard_esgf_search', "Earth System Grid (ESGF)"),
+        ('wizard_swift_login', "Swift Cloud"),
+        ('wizard_threddsservice', "Thredds Catalog Service"),
+        ('wizard_solr', "Birdhouse Solr Search")
+        ]
+    source = colander.SchemaNode(
+        colander.String(),
+        widget = RadioChoiceWidget(values = choices))
 
 import logging
 logger = logging.getLogger(__name__)

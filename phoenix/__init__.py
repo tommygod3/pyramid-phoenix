@@ -1,20 +1,22 @@
-from pyramid.config import Configurator
-from pyramid.events import subscriber
-from pyramid.events import NewRequest
-from pyramid.authentication import AuthTktAuthenticationPolicy
-from pyramid.authorization import ACLAuthorizationPolicy
-from phoenix.security import groupfinder, root_factory
-
-import pymongo
-import ldap
-
 import logging
 logger = logging.getLogger(__name__)
+
+__version__ = (0, 4, 5, 'final', 1)
+
+def get_version():
+    import phoenix.version
+    return phoenix.version.get_version(__version__)
 
 def main(global_config, **settings):
     """
     This function returns a Pyramid WSGI application.
     """
+    from pyramid.config import Configurator
+    from pyramid.events import subscriber
+    from pyramid.events import NewRequest
+    from pyramid.authentication import AuthTktAuthenticationPolicy
+    from pyramid.authorization import ACLAuthorizationPolicy
+    from phoenix.security import groupfinder, root_factory
 
     # security
     # TODO: move to security
@@ -41,9 +43,6 @@ def main(global_config, **settings):
     # celery
     config.include('pyramid_celery')
     config.configure_celery(global_config['__file__'])
-
-    # mozilla browserid
-    #config.include("pyramid_persona")
 
     # ldap
     config.include('pyramid_ldap')
@@ -81,15 +80,17 @@ def main(global_config, **settings):
     config.add_route('profile', '/profile/{tab}')
 
     # settings
-    config.add_route('settings', '/settings/overview')
+    config.add_route('settings', '/settings')
     config.add_route('settings_users', '/settings/users')
     config.add_route('settings_edit_user', '/settings/users/{userid}/edit')
     config.add_route('remove_user', '/settings/users/{userid}/remove')
-    config.add_route('settings_jobs', '/settings/jobs')
+    config.add_route('settings_monitor', '/settings/monitor')
+    config.add_route('settings_auth', '/settings/auth')
     config.add_route('settings_ldap', '/settings/ldap')
+    config.add_route('settings_solr', '/settings/solr/{tab}')
 
     # supervisor
-    config.add_route('settings_supervisor', '/settings/supervisor')
+    config.add_route('supervisor', '/supervisor')
     config.add_route('supervisor_process', '/supervisor/{action}/{name}')
     config.add_route('supervisor_log', '/supervisor_log/{name}')
 
@@ -98,6 +99,10 @@ def main(global_config, **settings):
     config.add_route('register_service', '/services/register')
     config.add_route('service_details', '/services/{service_id}')
     config.add_route('remove_service', '/services/{service_id}/remove')
+
+    # solr
+    config.add_route('index_service', '/solr/{service_id}/index')
+    config.add_route('clear_index', '/solr/clear')
     
     # wizard
     config.add_route('wizard', '/wizard')
@@ -106,6 +111,7 @@ def main(global_config, **settings):
     config.add_route('wizard_literal_inputs', '/wizard/literal_inputs')
     config.add_route('wizard_complex_inputs', '/wizard/complex_inputs')
     config.add_route('wizard_source', '/wizard/source')
+    config.add_route('wizard_solr', '/wizard/solr')
     config.add_route('wizard_csw', '/wizard/csw')
     config.add_route('wizard_csw_select', '/wizard/csw/{recordid}/select.json')
     config.add_route('wizard_esgf_search', '/wizard/esgf_search')
@@ -156,7 +162,6 @@ def main(global_config, **settings):
             try:
                 from phoenix.models import mongodb
                 settings['db'] = mongodb(event.request.registry)
-                logger.debug("Connected to mongodb %s.", settings['mongodb.url'])
             except:
                 logger.exception('Could not connect to mongodb %s.', settings['mongodb.url'])
         event.request.db = settings.get('db')
@@ -171,7 +176,6 @@ def main(global_config, **settings):
             try:
                 from owslib.wps import WebProcessingService
                 settings['wps'] = WebProcessingService(url=settings['wps.url'])
-                logger.debug('Connected to malleefowl wps %s', settings['wps.url'])
             except:
                 logger.exception('Could not connect malleefowl wps %s', settings['wps.url'])
         event.request.wps = settings.get('wps')
@@ -185,7 +189,6 @@ def main(global_config, **settings):
             try:
                 from owslib.csw import CatalogueServiceWeb
                 settings['csw'] = CatalogueServiceWeb(url=settings['csw.url'])
-                logger.debug('Connected to catalog service %s', settings['csw.url'])
             except:
                 logger.exception('Could not connect catalog service %s', settings['csw.url'])
         event.request.csw = settings.get('csw')

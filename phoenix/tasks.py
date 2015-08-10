@@ -6,6 +6,7 @@ import yaml
 import uuid
 import urllib
 from datetime import datetime
+from birdfeeder import feed_from_thredds, clear
 
 from phoenix.models import mongodb
 
@@ -64,10 +65,10 @@ def esgf_logon(self, userid, url, openid, password):
         credentials = execution.processOutputs[0].reference
         cert_expires = execution.processOutputs[1].data[0]
         db = mongodb(registry)
-        user = db.users.find_one({'userid':userid})
+        user = db.users.find_one({'identifier':userid})
         user['credentials'] = credentials
         user['cert_expires'] = cert_expires
-        db.users.update({'userid':userid}, user)
+        db.users.update({'identifier':userid}, user)
     return execution.status
 
 @app.task(bind=True)
@@ -155,3 +156,27 @@ def execute_process(self, userid, url, identifier, inputs, outputs, keywords=Non
             log(job)
         db.jobs.update({'identifier': job['identifier']}, job)
     return execution.getStatus()
+
+@app.task(bind=True)
+def index_thredds(self, url, maxrecords=-1, depth=2):
+    registry = app.conf['PYRAMID_REGISTRY']
+    db = mongodb(registry)
+    task = dict(task_id=self.request.id, url=url, status='started')
+    db.tasks.save(task)
+    service = registry.settings.get('solr.url')
+    try:
+        feed_from_thredds(service=service, catalog_url=url, depth=depth, maxrecords=maxrecords, batch_size=50000)
+        task['status'] = 'success'
+    except:
+        task['status'] = 'failure'
+        raise
+    finally:
+        db.tasks.update({'url': task['url']}, task)
+
+@app.task(bind=True)
+def clear_index(self):
+    registry = app.conf['PYRAMID_REGISTRY']
+    db = mongodb(registry)
+    service = registry.settings.get('solr.url')
+    clear(service=service)
+    db.tasks.drop()

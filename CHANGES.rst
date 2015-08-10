@@ -1,6 +1,34 @@
 Changes
 *******
 
+0.4.5 (2015-07-30)
+==================
+
+* added solr search in wizard.
+* index thredds services to solr in settings.
+
+0.4.4 (2015-06-30)
+==================
+
+* auth settings page added.
+* fixed swiftlogin.
+* allow edit of user emails.
+* fixed wizard favorites loading.
+* fixed account validation form.
+* show username in navigation bar.
+
+0.4.3 (2015-06-25)
+==================
+
+* cleaned up nginx template.
+* added user option for supervisor, nginx.
+
+0.4.2 (2015-06-24)
+==================
+
+* cleaned up default layout.
+* enabled https.
+
 0.4.1 (2015-06-22)
 ==================
 

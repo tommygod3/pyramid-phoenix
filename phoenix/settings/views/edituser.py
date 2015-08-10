@@ -4,7 +4,7 @@ from pyramid.httpexceptions import HTTPFound
 from deform import Form
 from deform import ValidationFailure
 
-from . import SettingsView
+from phoenix.settings.views import SettingsView
 
 import logging
 logger = logging.getLogger(__name__)
@@ -23,15 +23,15 @@ class EditUser(SettingsView):
         return breadcrumbs
 
     def generate_form(self):
-        from phoenix.schema.settings import UserSchema
-        return Form(schema=UserSchema(), buttons=('submit',), formid='deform')
+        from phoenix.settings.schema import EditUserSchema
+        return Form(schema=EditUserSchema(), buttons=('submit',), formid='deform')
 
     def process_form(self, form):
         try:
             controls = self.request.POST.items()
             appstruct = form.validate(controls)
             user = self.userdb.find_one(dict(identifier=self.userid))
-            for key in ['name', 'organisation', 'notes', 'group']:
+            for key in ['name', 'email', 'organisation', 'notes', 'group']:
                 user[key] = appstruct.get(key)
             self.db.users.update({'identifier':self.userid}, user)
         except ValidationFailure, e:

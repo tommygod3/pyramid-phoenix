@@ -86,12 +86,10 @@ class LdapSchema(colander.MappingSchema):
     username = colander.SchemaNode(
         colander.String(),
         title = "Username",
-        description = "Your username",
         )
     password = colander.SchemaNode(
         colander.String(),
         title = 'Password',
-        description = 'Your password',
         widget = deform.widget.PasswordWidget())
 
 class UserProfileSchema(colander.MappingSchema):
@@ -105,8 +103,8 @@ class UserProfileSchema(colander.MappingSchema):
         colander.String(),
         title = "EMail",
         validator = colander.Email(),
-        missing = '',
-        widget = deform.widget.TextInputWidget(template='readonly/textinput'),
+        missing = colander.drop,
+        widget = deform.widget.TextInputWidget(),
         )
     organisation = colander.SchemaNode(
         colander.String(),

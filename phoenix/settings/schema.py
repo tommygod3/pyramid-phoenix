@@ -3,39 +3,35 @@ import colander
 from colander import Invalid
 
 from phoenix.security import Admin, User, Guest
+from phoenix.schema import UserProfileSchema
 
 import logging
 logger = logging.getLogger(__name__)
 
-class UserSchema(colander.MappingSchema):
+class EditUserSchema(UserProfileSchema):
     choices = ((Admin, 'Admin'), (User, 'User'), (Guest, 'Guest'))
     
-    name = colander.SchemaNode(
-        colander.String(),
-        title = "Name",
-        missing = colander.drop,
-        )
-    userid = colander.SchemaNode(
-        colander.String(),
-        missing = colander.drop,
-        widget = deform.widget.TextInputWidget(readonly=True),
-        )
-    organisation = colander.SchemaNode(
-        colander.String(),
-        title = "Organisation",
-        missing = colander.drop,
-        )
-    notes = colander.SchemaNode(
-        colander.String(),
-        title = "Notes",
-        missing = colander.drop,
-        )
     group = colander.SchemaNode(
         colander.String(),
         validator=colander.OneOf([x[0] for x in choices]),
         widget=deform.widget.RadioChoiceWidget(values=choices, inline=True),
         title='Group',
         description='Select Group')
+
+class AuthSchema(colander.MappingSchema):
+    choices = [
+        ('esgf', 'ESGF OpenID'),
+        ('openid', 'OpenID'),
+        ('oauth2', 'OAuth 2.0'),
+        ('ldap', 'LDAP')]
+
+    protocol = colander.SchemaNode(
+        colander.Set(),
+        default = ['oauth2'],
+        title='Auth Protocol',
+        description='Choose at least one Authentication Protocol which is used in Phoenix',
+        validator=colander.Length(min=1),
+        widget=deform.widget.CheckboxChoiceWidget(values=choices, inline=True))
 
 class LdapSchema(colander.MappingSchema):
     server = colander.SchemaNode(
@@ -73,11 +69,13 @@ class LdapSchema(colander.MappingSchema):
                 ('ONELEVEL', 'One level'),
                 ('SUBTREE',  'Subtree')))
             )
+    name = colander.SchemaNode(
+            colander.String(),
+            title = 'User name attribute',
+            description = 'Optional: LDAP attribute to receive user name from query, e.g. "cn"',
+            missing = '')
     email = colander.SchemaNode(
             colander.String(),
-            title = 'User E-Mail attribute',
-            description = """At the moment, Phonix' account system is heavily
-                    build around the user email address. As an early adoption,
-                    we also use the email address here and pull it from the
-                    users LDAP entry. Name the name of the E-Mail attribute
-                    here, e.g. "mail" """)
+            title = 'User e-mail attribute',
+            description = 'Optional: LDAP attribute to receive user e-mail from query, e.g. "mail"',
+            missing = '')

@@ -9,18 +9,19 @@ from deform import Form, ValidationFailure
 
 from phoenix.views import MyView
 from phoenix.security import Admin, Guest, ESGF_Provider, authomatic, passwd_check
+from phoenix.models import auth_protocols
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-@forbidden_view_config(renderer='phoenix:templates/account/forbidden.pt', layout="frontpage")
+@forbidden_view_config(renderer='phoenix:templates/account/forbidden.pt', layout="default")
 def forbidden(request):
     request.response.status = 403
     return dict()
 
 @view_config(route_name='account_register', renderer='phoenix:templates/account/register.pt',
-             permission='view', layout="frontpage")
+             permission='view', layout="default")
 def register(request):
     return dict()
 
@@ -28,7 +29,8 @@ def register(request):
 class Account(MyView):
     def __init__(self, request):
         super(Account, self).__init__(request, name="account", title='Account')
-
+        
+        
     def appstruct(self, protocol):
         if protocol == 'oauth2':
             return dict(provider='github')
@@ -59,7 +61,10 @@ class Account(MyView):
             appstruct = form.validate(controls)
         except ValidationFailure, e:
             logger.exception('validation of form failed.')
-            return dict(active=protocol, form=e.render())
+            return dict(
+                active=protocol,
+                auth_protocols=auth_protocols(self.request),
+                form=e.render())
         else:
             if protocol == 'phoenix':
                 return self.phoenix_login(appstruct)
@@ -97,18 +102,21 @@ class Account(MyView):
             email = user.get('email')
             if email:
                 recipients.add(email)
-        
-        from pyramid_mailer.message import Message
-        message = Message(subject=subject,
-                          sender=sender,
-                          recipients=recipients,
-                          body=message)
-        try:
-            mailer.send_immediately(message, fail_silently=True)
-        except:
-            logger.exception("failed to send notification")
 
-    def login_success(self, login_id, email=None, name="Unknown", openid=None, local=False):
+        if len(recipients) > 0:
+            from pyramid_mailer.message import Message
+            message = Message(subject=subject,
+                            sender=sender,
+                            recipients=recipients,
+                            body=message)
+            try:
+                mailer.send_immediately(message, fail_silently=True)
+            except:
+                logger.exception("failed to send notification")
+        else:
+            logger.warn("Can't send notification. No admin emails are available.")
+
+    def login_success(self, login_id, email='', name="Unknown", openid=None, local=False):
         from phoenix.models import add_user
         user = self.request.db.users.find_one(dict(login_id=login_id))
         if user is None:
@@ -140,7 +148,7 @@ class Account(MyView):
     
     @view_config(route_name='account_login', renderer='phoenix:templates/account/login.pt')
     def login(self):
-        protocol = self.request.matchdict.get('protocol', 'esgf')
+        protocol = self.request.matchdict.get('protocol', 'phoenix')
 
         if protocol == 'ldap':
             # Ensure that the ldap connector is created
@@ -150,7 +158,10 @@ class Account(MyView):
         if 'submit' in self.request.POST:
             return self.process_form(form, protocol)
         # TODO: Add ldap to title?
-        return dict(active=protocol, title="Login", form=form.render( self.appstruct(protocol) ))
+        return dict(active=protocol,
+                    title="Login",
+                    auth_protocols=auth_protocols(self.request),
+                    form=form.render( self.appstruct(protocol) ))
 
     @view_config(route_name='account_logout', permission='edit')
     def logout(self):
@@ -160,7 +171,7 @@ class Account(MyView):
     def phoenix_login(self, appstruct):
         password = appstruct.get('password')
         if passwd_check(self.request, password):
-            return self.login_success(login_id="phoenix@localhost", email="phoenix@localhost", name="Phoenix", local=True)
+            return self.login_success(login_id="phoenix@localhost", name="Phoenix", local=True)
         else:
             return self.login_failure()
 
@@ -190,11 +201,11 @@ class Account(MyView):
                 elif result.provider.name == 'github':
                     # TODO: fix email ... get more infos ... which login_id?
                     login_id = "{0.username}@github.com".format(result.user)
-                    email = "{0.username}@github.com".format(result.user)
+                    #email = "{0.username}@github.com".format(result.user)
                     # get extra info
                     if result.user.credentials:
                         pass
-                    return self.login_success(login_id=login_id, email=email, name=result.user.name)
+                    return self.login_success(login_id=login_id, name=result.user.name)
         return response
 
     def ldap_prepare(self):
@@ -237,14 +248,16 @@ class Account(MyView):
         auth = connector.authenticate(username, password)
 
         if auth is not None:
+            # Get user name and email
             ldap_settings = self.db.ldap.find_one()
-            email = auth[1].get(ldap_settings['email'])[0]
-            # TODO: fix userid ... get more ldap infos
-            login_id = 'ldap_{0}'.format(email)
-            
+            name  = (auth[1].get(ldap_settings['name'])[0]
+                    if ldap_settings['name'] != '' else 'Unknown')
+            email = (auth[1].get(ldap_settings['email'])[0]
+                    if ldap_settings['email'] != '' else None)
+
             # Authentication successful
-            return self.login_success(login_id=login_id, email=email, name=email)
+            return self.login_success(login_id = auth[0], # userdn
+                    name = name, email = email)
         else:
             # Authentification failed
             return self.login_failure()
-           
