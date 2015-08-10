@@ -6,21 +6,17 @@ from phoenix.catalog import wps_url
 import colander
 import deform
 
-class Schema(colander.MappingSchema):
+import logging
+logger = logging.getLogger(__name__)
+    
+class ChooseSource(Wizard):
     choices = [
         ('wizard_esgf_search', "Earth System Grid (ESGF)"),
         ('wizard_swift_login', "Swift Cloud"),
         ('wizard_threddsservice', "Thredds Catalog Service"),
         ('wizard_solr', "Birdhouse Solr Search")
         ]
-    source = colander.SchemaNode(
-        colander.String(),
-        widget = deform.widget.RadioChoiceWidget(values = choices))
 
-import logging
-logger = logging.getLogger(__name__)
-    
-class ChooseSource(Wizard):
     def __init__(self, request):
         super(ChooseSource, self).__init__(
             request, name='wizard_source', title="Choose Data Source")
@@ -46,7 +42,7 @@ class ChooseSource(Wizard):
                 name = data_input.identifier,
                 title = data_input.title,
                 description = getattr(data_input, 'abstract'),
-                widget = deform.widget.RadioChoiceWidget(values=choices))
+                widget = deform.widget.RadioChoiceWidget(values=self.choices))
         
             schema.add(source)
         return schema
