@@ -15,7 +15,7 @@ class Schema(colander.MappingSchema):
         ]
     source = colander.SchemaNode(
         colander.String(),
-        widget = RadioChoiceWidget(values = choices))
+        widget = deform.widget.RadioChoiceWidget(values = choices))
 
 import logging
 logger = logging.getLogger(__name__)
