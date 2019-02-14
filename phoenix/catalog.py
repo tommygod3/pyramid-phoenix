@@ -36,16 +36,10 @@ def includeme(config):
 
 
 def catalog_factory(registry):
-    settings = registry.settings
-
     service_registry = twitcher_service_factory(registry)
 
-    if asbool(settings.get('phoenix.csw', True)):
-        csw = CatalogueServiceWeb(url=settings['csw.url'], skip_caps=True)
-        catalog = CatalogService(csw, service_registry)
-    else:
-        db = mongodb(registry)
-        catalog = MongodbCatalog(db.catalog, service_registry)
+    db = mongodb(registry)
+    catalog = MongodbCatalog(db.catalog, service_registry)
     return catalog
 
 
