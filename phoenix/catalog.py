@@ -151,7 +151,7 @@ class MongodbCatalog(Catalog):
 
     def insert_record(self, record):
         record['identifier'] = uuid.uuid4().get_urn()
-        self.collection.update_one({'source': record['source']}, {'$set': record}, True)
+        self.collection.update_one({'name': record['name']}, {'$set': record}, True)
 
     def harvest(self, url, service_type, service_name=None, service_title=None, public=False):
         if service_type == THREDDS_TYPE:
